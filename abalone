@@ -1,0 +1,336 @@
+#importing modules:
+import numpy as np 
+from numpy import *
+import pandas as pd
+import random
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+import warnings
+warnings.filterwarnings("ignore")
+
+from scipy.stats import skew
+from scipy.stats import norm
+
+from sklearn import datasets
+from sklearn import metrics
+from sklearn import preprocessing
+from sklearn.metrics import mean_squared_error 
+from sklearn.metrics import accuracy_score 
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import classification_report
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import Normalizer
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+
+
+##Loading abalone dataset
+data_int= pd.read_csv('abalone.csv',sep = ',')
+data_int['Age'] = data_int['Rings']+1.5
+data_int=data_int.drop(['Rings'],axis=1)
+
+#plot corr of each attrubites
+f,ax= ax = plt.subplots(figsize=(18, 10))
+mask = np.triu(np.ones_like(data_int.corr(), dtype=bool))
+cmap = sns.diverging_palette(230, 20, as_cmap=True)
+a=sns.heatmap (data_int.corr(), annot=True, mask=mask,cmap=cmap,linewidths=0.5)
+
+#def load_data(aba_num):
+data = pd.read_csv('abalone.csv',sep = ',')
+label = preprocessing.LabelEncoder()
+data['Sex']=label.fit_transform(data['Sex'])
+data['Sex'].value_counts()
+
+#cut rings column into 4 age groups
+#Class 1: 0 - 7 years
+#Class 2: 8- 10 years
+#Class 3: 11 - 15 years
+#Class 4: Greater than 15 years
+bins= [0,8,11,16,200]
+labels = ['Class1','Class2','Class3','Class4']
+data['Age Group'] = pd.cut(data['Rings']+1.5, bins=bins, labels=labels, right=False)
+data=data.drop(['Rings'],axis=1)
+data.head()
+
+# describe the data
+data.describe()
+# information of the data
+data.info()
+#Key insight    
+ #--No missing values in the dataset
+ #--All numerical features but 'sex' N "Age Group"
+ #--None of the column have minimum = 0 except Height
+ #--Each column has difference scale range
+
+#check distrubution of each attributes
+fig, axs = plt.subplots(3, 3, figsize=(12, 15))
+for col, ax in zip(data.columns[0:8], axs.flat):
+    sns.histplot(data=data, x=col, kde=True, hue='Age Group', common_norm=False, legend=ax==axs[0,0], ax=ax)
+plt.tight_layout()
+plt.show()
+
+#sperate numerical attributes and categorical attribute
+numerical_att = data.select_dtypes(include=[np.number]).columns
+categorical_att = data['Age Group']
+
+#buid up Neural networks
+#prepare data and split data
+data_y = data['Age Group']
+data=data.drop(['Age Group'],axis=1)
+data_x = data
+
+#set 60/40% train/test split
+x_train, x_test, y_train, y_test = train_test_split(data_x, data_y, test_size=0.4, random_state=46)
+    #return x_train, x_test, y_train, y_test
+print("Shape of x_train :", x_train.shape)
+print("Shape of x_test :", x_test.shape)
+print("Shape of y_train :", y_train.shape)
+print("Shape of y_test :", y_test.shape)
+data.head()
+
+#exam diffrent hidden neurons, & diffrent learning_rate
+#code reference:
+#sklearn.neural_network.MLPClassifier [Online] Scikit Learn Available at 
+#https://scikit-learn.org/stable/modules/generated/sklearn.neural_network.MLPClassifier.html 
+#[Accessed:5 June.2022]
+#sklearn.model_selection.GridSearchCV [Online] Scikit Learn Available at 
+#https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
+#[Accessed:5 June.2022]
+
+mlp = MLPClassifier(max_iter=10000)
+
+#set up patameters
+parameters = {
+    'hidden_layer_sizes':[(3,),(5,),(10,),(15,),(20,),(25,)],
+    'activation':['tanh','relu','logistic','softplus','softmax'],
+    'solver':['sgd'],
+    'alpha':[0.0001,0.05,0.1,1,10,100],
+    'learning_rate':['Constant','adaptive',0.01,0.03,0.05,0.07,0.09,0.1],
+    }
+
+# Search through parameters, find model for datasets
+clf = GridSearchCV(mlp, parameters, n_jobs=-1, cv=3)
+clf.fit(x_train, y_train)
+
+# find the best parameter in Q2
+print('The Best parameters are:\n', clf.best_params_)
+
+y_real, y_pred = y_test , clf.predict(x_test)
+acc_test = accuracy_score(y_pred, y_real)
+
+#print report for this setp
+print('\nReport results on the test set:')
+print(classification_report(y_real, y_pred))
+
+#y_pred_train = clf.predict(x_train)
+#acc_train = accuracy_score(y_pred_train, y_train) 
+print("acc_test: ", acc_test)
+means = clf.cv_results_['mean_test_score']
+print("\nMean: ", means)
+stds = clf.cv_results_['std_test_score']
+print("\nSTD: ", stds)
+con_intl1 = means + 1.96 *stds
+con_intl2 = means - 1.96 *stds
+print("\n95% Confidence Interval: ", con_intl1,"  ",con_intl2)
+
+#add a hideen layers with hidden neurons 20
+parameters2 = {
+    'hidden_layer_sizes':[(20,),(20,20)],
+    'activation':['relu'],
+    'solver':['sgd'],
+    'alpha':[0.0001],
+    'learning_rate':['adaptive'],
+    }
+
+# Search again for different parameters
+clf = GridSearchCV(mlp, parameters2, n_jobs=-1, cv=3)
+clf.fit(x_train, y_train)
+
+# Best paramete set
+print('The Best parameters:\n', clf.best_params_)
+
+y_real, y_pred = y_test , clf.predict(x_test)
+acc_test = accuracy_score(y_pred, y_real)
+
+#print report for this setp
+print('\nReport results on the test set:')
+print(classification_report(y_real, y_pred))
+
+#y_pred_train = clf.predict(x_train)
+#acc_train = accuracy_score(y_pred_train, y_train) 
+print("acc_test: ", acc_test)
+means = clf.cv_results_['mean_test_score']
+print("\nMean: ", means)
+stds = clf.cv_results_['std_test_score']
+print("\nSTD: ", stds)
+con_intl1 = means + 1.96 *stds
+con_intl2 = means - 1.96 *stds
+print("\n95% Confidence Interval: ", con_intl1,"  ",con_intl2)
+
+#compare between solver SGD & ADAM
+parameter3 = {
+    'hidden_layer_sizes':[(20,20)],
+    'activation':['relu'],
+    'solver':['sgd','adam'],
+    'alpha':[0.0001],
+    'learning_rate':['adaptive'],
+    }
+
+# Search parameters
+clf = GridSearchCV(mlp, parameter3, n_jobs=-1, cv=3)
+clf.fit(x_train, y_train)
+
+# Best paramete set
+print('The Best parameters:\n', clf.best_params_)
+
+
+y_real, y_pred = y_test , clf.predict(x_test)
+acc_test = accuracy_score(y_pred, y_real)
+
+#print report for this setp
+print('\nReport results on the test set:')
+print(classification_report(y_real, y_pred))
+
+#y_pred_train = clf.predict(x_train)
+#acc_train = accuracy_score(y_pred_train, y_train) 
+
+print("acc_test: ", acc_test)
+means = clf.cv_results_['mean_test_score']
+print("\nMean: ", means)
+stds = clf.cv_results_['std_test_score']
+print("\nSTD: ", stds)
+con_intl1 = means + 1.96 *stds
+con_intl2 = means - 1.96 *stds
+print("\n95% Confidence Interval: ", con_intl1,"  ",con_intl2)
+
+#Run the best model
+parameter_space4 = {
+    'hidden_layer_sizes':[(20,20)],
+    'activation':['relu'],
+    'solver':['adam'],
+    'alpha':[0.0001],
+    'learning_rate':['adaptive'],
+    }
+
+clf = GridSearchCV(mlp, parameter_space4, n_jobs=-1, cv=3)
+clf.fit(x_train, y_train)
+
+y_real, y_pred = y_test , clf.predict(x_test)
+acc_test = accuracy_score(y_pred, y_real)
+
+#print report for this setp
+print('\nReport results on the test set:')
+print(classification_report(y_real, y_pred))
+
+#y_pred_train = clf.predict(x_train)
+#acc_train = accuracy_score(y_pred_train, y_train) 
+
+print("\nacc_test: ", acc_test)
+print("------  All Results ------- ")
+means = clf.cv_results_['mean_test_score']
+print("\nMean: ", means)
+stds = clf.cv_results_['std_test_score']
+print("\nSTD: ", stds)
+con_intl1 = means + 1.96 *stds
+con_intl2 = means - 1.96 *stds
+print("\n95% Confidence Interval: ", con_intl1,"  ",con_intl2)
+for mean, std, params in zip(means, stds, clf.cv_results_['params']):
+    print("      %0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
+print("------  End All Results ------- ")
+
+#plot confusion matrix
+print(cm, '\nis confusion matrix')
+conf_matrix = pd.crosstab(y_train, y_pred_train, rownames=['Actual'], colnames=['Predicted'])
+cmap1=sns.color_palette("ch:s=-.2,r=.6", as_cmap=True)
+sns.heatmap(conf_matrix, annot=True,cmap=cmap1)
+
+#plot ROC/AUC curve
+#code refence: [9] Trevisan, V. (2022). ROC Curve [Online] Github.com Available at 
+#https://github.com/vinyluis/Articles/blob/main/ROC%20Curve%20and%20ROC%20AUC/ROC%20Curve%20-%20Multiclass.ipynb
+#[Accessed:5 June.2022]
+
+#plot ROC/AUC curve,Calculates the True Positive Rate (tpr) and the True Negative Rate (fpr) 
+
+def tpr_fpr(y_real, y_pred):
+    # Calculates each element of the confusion matrix
+    cm = confusion_matrix(y_real, y_pred)
+    TN = cm[0, 0]
+    FP = cm[0, 1]
+    FN = cm[1, 0]
+    TP = cm[1, 1]
+    tpr =  TP/(TP + FN) # sensitivity - true positive rate
+    fpr = 1 - TN/(TN+FP) # 1-specificity - false positive rate
+    return tpr, fpr
+    
+#Calculates all the ROC Curve coordinates (tpr and fpr) by considering
+#each point as a treshold for the predicion of the class.
+def roc_coord(y_real, y_proba):
+    tpr_list = [0]
+    fpr_list = [0]
+    for i in range(len(y_proba)):
+        threshold = y_proba[i]
+        y_pred = y_proba >= threshold
+        tpr, fpr = tpr_fpr(y_real, y_pred)
+        tpr_list.append(tpr)
+        fpr_list.append(fpr)
+    return tpr_list, fpr_list
+ 
+#plot the ROC Curve by using the list of coordinates (tpr and fpr).
+def plot_curve(tpr, fpr, scatter = True, ax = None):
+    
+    if ax == None:
+        plt.figure(figsize = (5, 5))
+        ax = plt.axes()
+    
+    if scatter:
+        sns.scatterplot(x = fpr, y = tpr, ax = ax)
+    sns.lineplot(x = fpr, y = tpr, ax = ax)
+    sns.lineplot(x = [0, 1], y = [0, 1], color = 'green', ax = ax)
+    plt.xlim(-0.05, 1.05)
+    plt.ylim(-0.05, 1.05)
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    
+model_class = RandomForestClassifier(n_estimators = 50, criterion = 'gini')
+model_class.fit(x_train, y_train)
+y_pred = model_class.predict(x_test)
+y_proba = model_class.predict_proba(x_test)
+
+classes = model_class.classes_
+classes
+# Plots the Probability Distributions and the ROC Curves One vs Rest
+plt.figure(figsize = (12, 8))
+bins = [i/20 for i in range(20)] + [1]
+classes = model_class.classes_
+roc_auc_ovr = {}
+for i in range(len(classes)):
+    # Gets the class
+    c = classes[i]
+    
+    # Prepares an auxiliar dataframe to help with the plots
+    df_aux = x_test.copy()
+    df_aux['class'] = [1 if y == c else 0 for y in y_test]
+    df_aux['prob'] = y_proba[:, i]
+    df_aux = df_aux.reset_index(drop = True)
+    
+    # Plots the probability distribution for the class and the rest
+    ax = plt.subplot(2, 4,i+1)
+    sns.histplot(x = "prob", data = df_aux, hue = 'class', color = 'b', ax = ax, bins = bins)
+    ax.set_title(c)
+    ax.legend([f"Class: {c}", "Rest"])
+    ax.set_xlabel(f"P(x = {c})")
+    
+    # Calculates the ROC Coordinates and plots the ROC Curves
+    ax_bottom = plt.subplot(2, 4, i+5)
+    tpr, fpr = roc_coord(df_aux['class'], df_aux['prob'])
+    plot_curve(tpr, fpr, scatter = False, ax = ax_bottom)
+    ax_bottom.set_title("ROC Curve OvR")
+    
+    # Calculates the ROC AUC OvR
+    roc_auc_ovr[c] = roc_auc_score(df_aux['class'], df_aux['prob'])
+plt.tight_layout()
